@@ -1,0 +1,113 @@
+# Sobe o RabbitMQ, a API e os 3 serviços.
+# Os valores ${...} vêm do arquivo .env (já vem pronto no repositório).
+
+name: mensageria-ecommerce
+
+services:
+
+  # 1) Configura o RabbitMQ: junta rabbitmq/topologia.json (exchanges, filas,
+  #    bindings e permissões) com os usuários e senhas do .env e gera o
+  #    definitions.json. Roda uma vez e termina.
+  rabbitmq-init:
+    image: python:3.13-slim
+    command: python /rabbitmq/gerar_definitions.py
+    env_file: .env
+    volumes:
+      - ./rabbitmq:/rabbitmq:ro
+      - rabbitmq-definitions:/definitions
+
+  # 2) O broker. Carrega o definitions.json ao iniciar.
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    hostname: rabbitmq                # nome fixo: o RabbitMQ guarda os dados por hostname
+    ports:
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"   # painel web (a porta AMQP 5672 fica só na rede interna)
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq-definitions:/etc/rabbitmq/definitions:ro
+      - rabbitmq-data:/var/lib/rabbitmq                # filas e mensagens persistidas
+    depends_on:
+      rabbitmq-init:
+        condition: service_completed_successfully
+    healthcheck:                      # os outros serviços só sobem quando o broker estiver pronto
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # 3) API de Pedidos (C#): recebe o pedido e publica pedido.criado.
+  api-pedidos:
+    build: ./api-pedidos
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      RabbitMq__Host: rabbitmq
+      RabbitMq__VirtualHost: ${RABBITMQ_VHOST}
+      RabbitMq__Usuario: ${API_PEDIDOS_RABBITMQ_USER}
+      RabbitMq__Senha: ${API_PEDIDOS_RABBITMQ_PASS}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 4) Serviço de Estoque (Python): consome pedido.criado e publica estoque.reservado.
+  servico-estoque:
+    build: ./servico-estoque
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      RABBITMQ_USER: ${ESTOQUE_RABBITMQ_USER}
+      RABBITMQ_PASS: ${ESTOQUE_RABBITMQ_PASS}
+      FALHA_PERCENTUAL: ${FALHA_PERCENTUAL:-10}
+      FALHA_FATAL_PERCENTUAL: ${FALHA_FATAL_PERCENTUAL:-5}
+      MAX_TENTATIVAS: ${MAX_TENTATIVAS:-3}
+      PREFETCH: ${PREFETCH:-10}
+    deploy:
+      replicas: ${ESTOQUE_REPLICAS:-1}     # quantos containers deste serviço
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 5) Serviço de Pagamento (Python): consome estoque.reservado e publica pagamento.aprovado.
+  servico-pagamento:
+    build: ./servico-pagamento
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      RABBITMQ_USER: ${PAGAMENTO_RABBITMQ_USER}
+      RABBITMQ_PASS: ${PAGAMENTO_RABBITMQ_PASS}
+      FALHA_PERCENTUAL: ${FALHA_PERCENTUAL:-10}
+      FALHA_FATAL_PERCENTUAL: ${FALHA_FATAL_PERCENTUAL:-5}
+      MAX_TENTATIVAS: ${MAX_TENTATIVAS:-3}
+      PREFETCH: ${PREFETCH:-10}
+    deploy:
+      replicas: ${PAGAMENTO_REPLICAS:-1}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 6) Serviço de Logística (Go): consome pagamento.aprovado e agenda a entrega.
+  servico-logistica:
+    build: ./servico-logistica
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      RABBITMQ_USER: ${LOGISTICA_RABBITMQ_USER}
+      RABBITMQ_PASS: ${LOGISTICA_RABBITMQ_PASS}
+      FALHA_PERCENTUAL: ${FALHA_PERCENTUAL:-10}
+      FALHA_FATAL_PERCENTUAL: ${FALHA_FATAL_PERCENTUAL:-5}
+      MAX_TENTATIVAS: ${MAX_TENTATIVAS:-3}
+      PREFETCH: ${PREFETCH:-10}
+    deploy:
+      replicas: ${LOGISTICA_REPLICAS:-1}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-data:
+  rabbitmq-definitions:

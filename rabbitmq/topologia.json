@@ -1,0 +1,43 @@
+{
+  "exchanges": [
+    { "name": "ecommerce.eventos", "type": "topic",  "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "ecommerce.retry",   "type": "fanout", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "ecommerce.dlx",     "type": "fanout", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "estoque.reservar", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "classic", "x-message-ttl": 600000, "x-dead-letter-exchange": "ecommerce.dlx" }
+    },
+    {
+      "name": "pagamento.processar", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "classic", "x-message-ttl": 600000, "x-dead-letter-exchange": "ecommerce.dlx" }
+    },
+    {
+      "name": "logistica.agendar", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "classic", "x-message-ttl": 600000, "x-dead-letter-exchange": "ecommerce.dlx" }
+    },
+    {
+      "name": "ecommerce.retry.espera", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "classic", "x-message-ttl": 5000, "x-dead-letter-exchange": "ecommerce.eventos" }
+    },
+    {
+      "name": "ecommerce.dlq", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "classic" }
+    }
+  ],
+  "bindings": [
+    { "source": "ecommerce.eventos", "destination": "estoque.reservar",       "destination_type": "queue", "routing_key": "pedido.criado",      "arguments": {} },
+    { "source": "ecommerce.eventos", "destination": "pagamento.processar",    "destination_type": "queue", "routing_key": "estoque.reservado",  "arguments": {} },
+    { "source": "ecommerce.eventos", "destination": "logistica.agendar",      "destination_type": "queue", "routing_key": "pagamento.aprovado", "arguments": {} },
+    { "source": "ecommerce.retry",   "destination": "ecommerce.retry.espera", "destination_type": "queue", "routing_key": "",                   "arguments": {} },
+    { "source": "ecommerce.dlx",     "destination": "ecommerce.dlq",          "destination_type": "queue", "routing_key": "",                   "arguments": {} }
+  ],
+  "permissoes": {
+    "admin":     { "configure": ".*", "write": ".*", "read": ".*" },
+    "api":      { "configure": "^$", "write": "^ecommerce\\.eventos$",          "read": "^$" },
+    "estoque":   { "configure": "^$", "write": "^ecommerce\\.(eventos|retry)$", "read": "^estoque\\.reservar$" },
+    "pagamento": { "configure": "^$", "write": "^ecommerce\\.(eventos|retry)$", "read": "^pagamento\\.processar$" },
+    "logistica": { "configure": "^$", "write": "^ecommerce\\.retry$",           "read": "^logistica\\.agendar$" }
+  }
+}

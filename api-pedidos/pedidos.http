@@ -1,0 +1,22 @@
+@api = http://localhost:8080
+
+### Criar pedido
+POST {{api}}/pedidos
+Content-Type: application/json
+
+{
+  "clienteId": "cliente-42",
+  "itens": [
+    { "produtoId": "SKU-001", "quantidade": 2, "precoUnitario": 49.90 },
+    { "produtoId": "SKU-777", "quantidade": 1, "precoUnitario": 199.00 }
+  ]
+}
+
+### Consultar pedido (troque pelo pedidoId retornado)
+GET {{api}}/pedidos/00000000-0000-0000-0000-000000000000
+
+### Pedido inválido (400)
+POST {{api}}/pedidos
+Content-Type: application/json
+
+{ "clienteId": "cliente-42", "itens": [] }
