@@ -12,6 +12,10 @@ Os serviços não declaram filas nem exchanges: eles só publicam e consomem. As
 
 ### 3.2 Argumentos das filas e bindings
 
+![Topologia completa do RabbitMQ](diagrama.png)
+
+*Topologia completa: caminho normal em preto, retry em laranja e DLX/DLQ em vermelho.*
+
 | Fila | Argumentos | Binding |
 |---|---|---|
 | `estoque.reservar` | TTL 600000 ms, DLX `ecommerce.dlx` | `ecommerce.eventos` → `pedido.criado` |
