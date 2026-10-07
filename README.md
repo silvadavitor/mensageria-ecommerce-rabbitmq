@@ -98,6 +98,7 @@ docker compose down -v     # para tudo e apaga filas e mensagens
 ## Configurações do `.env`
 
 O `.env` já vem pronto no repositório, com senhas simples, porque o projeto roda só localmente. Não precisa mexer em nada para funcionar.
+Em um ambiente real, o `.env` não deve ser versionado no repositório. Neste projeto, ele está presente apenas para facilitar os testes e a execução local. Em um cenário de produção, o arquivo seria adicionado ao .`.gitignore` e as credenciais seriam configuradas de forma segura.
 
 | Variável | Padrão | O que faz |
 |----------|--------|-----------|
