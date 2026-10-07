@@ -135,6 +135,15 @@ Depois de alterar o `.env`, rode `docker compose up -d` de novo para aplicar.
 
 Toda a topologia está em [rabbitmq/topologia.json](rabbitmq/topologia.json).
 
+### Criptografia
+
+A criptografia não foi configurada, porque o projeto é para uso local, em ambiente de desenvolvimento. Hoje a comunicação com o RabbitMQ (AMQP na porta 5672 e o painel na 15672) não é criptografada, e as mensagens ficam gravadas sem criptografia no volume `rabbitmq-data`.
+
+Para levar o projeto para produção, seriam configurados:
+
+- **TLS na comunicação:** o broker passaria a aceitar só AMQPS (porta 5671), com a porta 5672 desligada, e o painel passaria a usar HTTPS. A API e os serviços se conectariam por `amqps://`, validando o certificado do broker.
+- **Criptografia do volume do RabbitMQ:** o disco onde fica o `rabbitmq-data` seria criptografado (por exemplo, LUKS no Linux ou um volume criptografado do provedor de nuvem, como o EBS da AWS), para que as mensagens persistidas não possam ser lidas por quem tiver acesso ao disco.
+
 ## Problemas comuns
 
 | Problema | Solução |
